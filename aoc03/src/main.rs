@@ -1,8 +1,8 @@
-use std::io::BufReader;
-use std::io::BufRead;
 use std::fs::File;
+use std::io::BufRead;
+use std::io::BufReader;
 
-fn get_input(filename : &str) -> Vec<String> {
+fn get_input(filename: &str) -> Vec<String> {
     let file = File::open(filename).unwrap();
     let reader = BufReader::new(file);
     let mut lines: Vec<String> = Vec::new();
@@ -13,7 +13,7 @@ fn get_input(filename : &str) -> Vec<String> {
     lines
 }
 
-#[derive(Clone,Copy,Debug,Default)]
+#[derive(Clone, Copy, Debug, Default)]
 struct PartNumber {
     number: u32,
     row: usize,
@@ -24,6 +24,8 @@ struct PartNumber {
 
 #[derive(Debug)]
 struct Symbol {
+    is_star: bool,
+    gear_ratio: u32,
     row: usize,
     col: usize,
 }
@@ -71,7 +73,7 @@ fn update_parts(parts: &mut Vec<PartNumber>, symbols: &Vec<Symbol>) {
     }
 }
 
-fn read_schematic(lines: &Vec<String>) -> u32 {
+fn read_schematic(lines: &Vec<String>) -> (Vec<PartNumber>, Vec<Symbol>) {
     let mut part_numbers: Vec<u32> = Vec::new();
     part_numbers.push(123);
     let mut parts: Vec<PartNumber> = Vec::new();
@@ -86,7 +88,7 @@ fn read_schematic(lines: &Vec<String>) -> u32 {
                     if state == ParseState::ReadingDigits {
                         state = ParseState::FinishedDigits;
                     }
-                },
+                }
                 digit if c.is_ascii_digit() => {
                     if state == ParseState::WaitingForDigits {
                         state = ParseState::ReadingDigits;
@@ -95,20 +97,27 @@ fn read_schematic(lines: &Vec<String>) -> u32 {
                             row,
                             col_start: col,
                             col_end: col,
-                            valid: false
+                            valid: false,
                         };
                     }
                     pn.number *= 10;
                     pn.number += digit.to_digit(10).unwrap();
                     pn.col_end = col;
-                },
-                _ => {
+                }
+                s => {
                     if state == ParseState::ReadingDigits {
                         state = ParseState::FinishedDigits;
                     }
-                    let symbol = Symbol { row, col };
+                    let is_star = s == '*';
+                    let gear_ratio = 0;
+                    let symbol = Symbol {
+                        is_star,
+                        gear_ratio,
+                        row,
+                        col,
+                    };
                     symbols.push(symbol);
-                },
+                }
             }
             if state == ParseState::FinishedDigits {
                 parts.push(pn);
@@ -120,6 +129,11 @@ fn read_schematic(lines: &Vec<String>) -> u32 {
             //state = ParseState::WaitingForDigits;
         }
     }
+    (parts, symbols)
+}
+
+fn compute_part_sum(lines: &Vec<String>) -> u32 {
+    let (mut parts, symbols) = read_schematic(lines);
 
     update_parts(&mut parts, &symbols);
 
@@ -131,7 +145,19 @@ fn read_schematic(lines: &Vec<String>) -> u32 {
     sum
 }
 
+fn find_gears(parts: &Vec<PartNumber>, symbols: &mut Vec<Symbol>) {
+    // Gears have exactly 2 adjacent parts
+    for sym in symbols {
+        let mut found = 0;
+        for part in parts {}
+    }
+}
+
 fn sum_gear_ratios(lines: &Vec<String>) -> u32 {
+    let (mut parts, mut symbols) = read_schematic(lines);
+    update_parts(&mut parts, &symbols);
+    find_gears(&parts, &mut symbols);
+
     let sum = 0;
     println!("Gear Ratios: {}", sum);
     sum
@@ -139,18 +165,18 @@ fn sum_gear_ratios(lines: &Vec<String>) -> u32 {
 
 #[test]
 fn test_prelim() {
-    let sum = read_schematic(&get_input("prelim.txt"));
+    let sum = compute_part_sum(&get_input("prelim.txt"));
     assert_eq!(sum, 4361);
 }
 
 #[test]
 fn test_part1() {
-    let sum = read_schematic(&get_input("input.txt"));
+    let sum = compute_part_sum(&get_input("input.txt"));
     assert_eq!(sum, 532428);
 }
 
 fn main() {
-    read_schematic(&get_input("prelim.txt"));
-    read_schematic(&get_input("input.txt"));
+    compute_part_sum(&get_input("prelim.txt"));
+    compute_part_sum(&get_input("input.txt"));
     sum_gear_ratios(&get_input("prelim.txt"));
 }
