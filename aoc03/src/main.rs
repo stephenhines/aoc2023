@@ -35,24 +35,34 @@ enum ParseState {
     FinishedDigits,
 }
 
+fn is_adjacent(part: &PartNumber, sym: &Symbol) -> bool {
+    if part.row == sym.row {
+        // In the same row, you can only be directly to the left or right.
+        if part.col_start == sym.col + 1 || part.col_end + 1 == sym.col {
+            return true;
+        }
+    } else if part.row + 1 == sym.row || part.row == sym.row + 1 {
+        // In an adjacent row, we can be anywhere between one to the left,
+        // and one to the right of the columns.
+        let sc = sym.col;
+        let left = part.col_start;
+        let right = part.col_end;
+        if sc + 1 >= left && right + 1 >= sc {
+            return true;
+        }
+    }
+    false
+}
+
 fn update_parts(parts: &mut Vec<PartNumber>, symbols: &Vec<Symbol>) {
     for part in parts {
         for sym in symbols {
-            if part.row == sym.row {
-                // In the same row, you can only be directly to the left or right.
-                if part.col_start == sym.col + 1 || part.col_end + 1 == sym.col {
-                    part.valid = true;
-                }
-            } else if part.row + 1 == sym.row || part.row == sym.row + 1 {
-                // In an adjacent row, we can be anywhere between one to the left,
-                // and one to the right of the columns.
-                let sc = sym.col;
-                let left = part.col_start;
-                let right = part.col_end;
-                if sc + 1 >= left && right + 1 >= sc {
-                    part.valid = true;
-                }
-            } else if sym.row > part.row + 2 {
+            if is_adjacent(part, sym) {
+                part.valid = true;
+                break;
+            }
+
+            if sym.row > part.row + 2 {
                 // Once we're 2 away on the symbols, we can't possibly validate
                 // more parts, so we skip the rest.
                 break;
@@ -121,6 +131,12 @@ fn read_schematic(lines: &Vec<String>) -> u32 {
     sum
 }
 
+fn sum_gear_ratios(lines: &Vec<String>) -> u32 {
+    let sum = 0;
+    println!("Gear Ratios: {}", sum);
+    sum
+}
+
 #[test]
 fn test_prelim() {
     let sum = read_schematic(&get_input("prelim.txt"));
@@ -136,4 +152,5 @@ fn test_part1() {
 fn main() {
     read_schematic(&get_input("prelim.txt"));
     read_schematic(&get_input("input.txt"));
+    sum_gear_ratios(&get_input("prelim.txt"));
 }
