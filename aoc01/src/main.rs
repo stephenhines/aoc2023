@@ -1,8 +1,8 @@
-use std::io::BufReader;
-use std::io::BufRead;
 use std::fs::File;
+use std::io::BufRead;
+use std::io::BufReader;
 
-fn get_input(filename : &str) -> Vec<String> {
+fn get_input(filename: &str) -> Vec<String> {
     let file = File::open(filename).unwrap();
     let reader = BufReader::new(file);
     let mut lines: Vec<String> = Vec::new();
@@ -26,8 +26,9 @@ fn calibrate(lines: &Vec<String>) -> u32 {
     sum
 }
 
-const PATTERNS : [&str; 10] = ["IGNORED", "one", "two", "three", "four", "five", "six",
-"seven", "eight", "nine"];
+const PATTERNS: [&str; 10] = [
+    "IGNORED", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+];
 
 fn get_line_calibration(line: &String) -> u32 {
     let mut first_index = line.len();
@@ -46,7 +47,7 @@ fn get_line_calibration(line: &String) -> u32 {
         last_value = line.chars().collect::<Vec<_>>()[idx].to_digit(10).unwrap();
     }
 
-    let mut i = 1;  // Skip the IGNORED zero entry
+    let mut i = 1; // Skip the IGNORED zero entry
     while i < PATTERNS.len() {
         if let Some(idx) = line[..first_index_end].find(PATTERNS[i]) {
             if idx < first_index {
@@ -56,7 +57,7 @@ fn get_line_calibration(line: &String) -> u32 {
             }
         }
         if let Some(idx) = line[last_index..].rfind(PATTERNS[i]) {
-            last_index += idx;  // += since we sliced into the original string
+            last_index += idx; // += since we sliced into the original string
             last_value = i as u32;
         }
         i += 1;

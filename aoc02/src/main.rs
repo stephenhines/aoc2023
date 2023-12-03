@@ -1,8 +1,8 @@
-use std::io::BufReader;
-use std::io::BufRead;
 use std::fs::File;
+use std::io::BufRead;
+use std::io::BufReader;
 
-fn get_input(filename : &str) -> Vec<String> {
+fn get_input(filename: &str) -> Vec<String> {
     let file = File::open(filename).unwrap();
     let reader = BufReader::new(file);
     let mut lines: Vec<String> = Vec::new();
@@ -48,9 +48,15 @@ fn check_game(line: &String) -> u32 {
         }
 
         // Verify color maximums
-        if num_red > MAX_RED { return 0; }
-        if num_green > MAX_GREEN { return 0; }
-        if num_blue > MAX_BLUE { return 0; }
+        if num_red > MAX_RED {
+            return 0;
+        }
+        if num_green > MAX_GREEN {
+            return 0;
+        }
+        if num_blue > MAX_BLUE {
+            return 0;
+        }
     }
 
     game_number
@@ -100,9 +106,15 @@ fn power(line: &String) -> u32 {
         }
 
         // Find color maximums
-        if num_red > max_red { max_red = num_red; }
-        if num_green > max_green { max_green = num_green; }
-        if num_blue > max_blue { max_blue = num_blue; }
+        if num_red > max_red {
+            max_red = num_red;
+        }
+        if num_green > max_green {
+            max_green = num_green;
+        }
+        if num_blue > max_blue {
+            max_blue = num_blue;
+        }
     }
 
     max_red * max_green * max_blue
@@ -116,7 +128,6 @@ fn sum_power(lines: &Vec<String>) -> u32 {
     println!("sum power: {}", sum);
     sum
 }
-
 
 #[test]
 fn test_prelim() {
