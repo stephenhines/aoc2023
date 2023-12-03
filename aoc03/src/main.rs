@@ -74,8 +74,6 @@ fn update_parts(parts: &mut Vec<PartNumber>, symbols: &Vec<Symbol>) {
 }
 
 fn read_schematic(lines: &Vec<String>) -> (Vec<PartNumber>, Vec<Symbol>) {
-    let mut part_numbers: Vec<u32> = Vec::new();
-    part_numbers.push(123);
     let mut parts: Vec<PartNumber> = Vec::new();
     let mut symbols: Vec<Symbol> = Vec::new();
 
@@ -146,10 +144,23 @@ fn compute_part_sum(lines: &Vec<String>) -> u32 {
 }
 
 fn find_gears(parts: &Vec<PartNumber>, symbols: &mut Vec<Symbol>) {
-    // Gears have exactly 2 adjacent parts
-    for sym in symbols {
+    // Gears have exactly 2 adjacent parts with a star symbol.
+    for sym in symbols.iter_mut().filter(|s| s.is_star) {
         let mut found = 0;
-        for part in parts {}
+        let mut gear_components: Vec<u32> = Vec::new();
+        for part in parts {
+            if is_adjacent(part, sym) {
+                found += 1;
+                gear_components.push(part.number);
+            }
+            if found >= 3 {
+                break;
+            }
+        }
+        if found == 2 {
+            sym.gear_ratio = gear_components.iter().product();
+            //println!("Gear: {:?}", sym);
+        }
     }
 }
 
@@ -158,7 +169,11 @@ fn sum_gear_ratios(lines: &Vec<String>) -> u32 {
     update_parts(&mut parts, &symbols);
     find_gears(&parts, &mut symbols);
 
-    let sum = 0;
+    let sum: u32 = symbols
+        .iter()
+        .filter(|s| s.is_star)
+        .map(|s| s.gear_ratio)
+        .sum();
     println!("Gear Ratios: {}", sum);
     sum
 }
@@ -175,8 +190,21 @@ fn test_part1() {
     assert_eq!(sum, 532428);
 }
 
+#[test]
+fn test_prelim2() {
+    let sum = sum_gear_ratios(&get_input("prelim.txt"));
+    assert_eq!(sum, 467835);
+}
+
+#[test]
+fn test_part2() {
+    let sum = sum_gear_ratios(&get_input("input.txt"));
+    assert_eq!(sum, 84051670);
+}
+
 fn main() {
     compute_part_sum(&get_input("prelim.txt"));
     compute_part_sum(&get_input("input.txt"));
     sum_gear_ratios(&get_input("prelim.txt"));
+    sum_gear_ratios(&get_input("input.txt"));
 }
