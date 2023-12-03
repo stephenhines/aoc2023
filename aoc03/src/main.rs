@@ -14,7 +14,7 @@ fn get_input(filename: &str) -> Vec<String> {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-struct PartNumber {
+struct Part {
     number: u32,
     row: usize,
     col_start: usize,
@@ -30,14 +30,7 @@ struct Symbol {
     col: usize,
 }
 
-#[derive(PartialEq)]
-enum ParseState {
-    WaitingForDigits,
-    ReadingDigits,
-    FinishedDigits,
-}
-
-fn is_adjacent(part: &PartNumber, sym: &Symbol) -> bool {
+fn is_adjacent(part: &Part, sym: &Symbol) -> bool {
     if part.row == sym.row {
         // In the same row, you can only be directly to the left or right.
         if part.col_start == sym.col + 1 || part.col_end + 1 == sym.col {
@@ -56,7 +49,7 @@ fn is_adjacent(part: &PartNumber, sym: &Symbol) -> bool {
     false
 }
 
-fn update_parts(parts: &mut Vec<PartNumber>, symbols: &Vec<Symbol>) {
+fn update_parts(parts: &mut Vec<Part>, symbols: &Vec<Symbol>) {
     for part in parts {
         for sym in symbols {
             if is_adjacent(part, sym) {
@@ -73,24 +66,31 @@ fn update_parts(parts: &mut Vec<PartNumber>, symbols: &Vec<Symbol>) {
     }
 }
 
-fn read_schematic(lines: &Vec<String>) -> (Vec<PartNumber>, Vec<Symbol>) {
-    let mut parts: Vec<PartNumber> = Vec::new();
+fn read_schematic(lines: &[String]) -> (Vec<Part>, Vec<Symbol>) {
+    #[derive(PartialEq)]
+    enum ParseDigits {
+        Waiting,  // Waiting to read the start of a span of digits
+        Reading,  // Reading through a span of digits
+        Finished, // Finished reading a span (need to update and clean up)
+    }
+
+    let mut parts: Vec<Part> = Vec::new();
     let mut symbols: Vec<Symbol> = Vec::new();
 
     for (row, line) in lines.iter().enumerate() {
-        let mut state = ParseState::WaitingForDigits;
-        let mut pn: PartNumber = Default::default();
+        let mut state = ParseDigits::Waiting;
+        let mut p: Part = Default::default();
         for (col, c) in line.chars().enumerate() {
             match c {
                 '.' => {
-                    if state == ParseState::ReadingDigits {
-                        state = ParseState::FinishedDigits;
+                    if state == ParseDigits::Reading {
+                        state = ParseDigits::Finished;
                     }
                 }
                 digit if c.is_ascii_digit() => {
-                    if state == ParseState::WaitingForDigits {
-                        state = ParseState::ReadingDigits;
-                        pn = PartNumber {
+                    if state == ParseDigits::Waiting {
+                        state = ParseDigits::Reading;
+                        p = Part {
                             number: 0,
                             row,
                             col_start: col,
@@ -98,13 +98,13 @@ fn read_schematic(lines: &Vec<String>) -> (Vec<PartNumber>, Vec<Symbol>) {
                             valid: false,
                         };
                     }
-                    pn.number *= 10;
-                    pn.number += digit.to_digit(10).unwrap();
-                    pn.col_end = col;
+                    p.number *= 10;
+                    p.number += digit.to_digit(10).unwrap();
+                    p.col_end = col;
                 }
                 s => {
-                    if state == ParseState::ReadingDigits {
-                        state = ParseState::FinishedDigits;
+                    if state == ParseDigits::Reading {
+                        state = ParseDigits::Finished;
                     }
                     let is_star = s == '*';
                     let gear_ratio = 0;
@@ -117,20 +117,20 @@ fn read_schematic(lines: &Vec<String>) -> (Vec<PartNumber>, Vec<Symbol>) {
                     symbols.push(symbol);
                 }
             }
-            if state == ParseState::FinishedDigits {
-                parts.push(pn);
-                state = ParseState::WaitingForDigits;
+            if state == ParseDigits::Finished {
+                parts.push(p);
+                state = ParseDigits::Waiting;
             }
         }
-        if state == ParseState::FinishedDigits || state == ParseState::ReadingDigits {
-            parts.push(pn);
-            //state = ParseState::WaitingForDigits;
+        if state == ParseDigits::Finished || state == ParseDigits::Reading {
+            parts.push(p);
+            //state = ParseDigits::Waiting;
         }
     }
     (parts, symbols)
 }
 
-fn compute_part_sum(lines: &Vec<String>) -> u32 {
+fn compute_part_sum(lines: &[String]) -> u32 {
     let (mut parts, symbols) = read_schematic(lines);
 
     update_parts(&mut parts, &symbols);
@@ -143,7 +143,7 @@ fn compute_part_sum(lines: &Vec<String>) -> u32 {
     sum
 }
 
-fn find_gears(parts: &Vec<PartNumber>, symbols: &mut Vec<Symbol>) {
+fn find_gears(parts: &[Part], symbols: &mut [Symbol]) {
     // Gears have exactly 2 adjacent parts with a star symbol.
     for sym in symbols.iter_mut().filter(|s| s.is_star) {
         let mut found = 0;
@@ -164,7 +164,7 @@ fn find_gears(parts: &Vec<PartNumber>, symbols: &mut Vec<Symbol>) {
     }
 }
 
-fn sum_gear_ratios(lines: &Vec<String>) -> u32 {
+fn sum_gear_ratios(lines: &[String]) -> u32 {
     let (mut parts, mut symbols) = read_schematic(lines);
     update_parts(&mut parts, &symbols);
     find_gears(&parts, &mut symbols);
