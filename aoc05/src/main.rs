@@ -20,18 +20,6 @@ struct ElfMap {
     range_len: u64,
 }
 
-#[derive(Debug, PartialEq)]
-enum ParseState {
-    ReadSeeds,
-    ReadSeedToSoilMap,
-    ReadSoilToFertilizerMap,
-    ReadFertilizerToWaterMap,
-    ReadWaterToLightMap,
-    ReadLightToTemperatureMap,
-    ReadTemperatureToHumidityMap,
-    ReadHumidityToLocationMap,
-}
-
 fn map_elf_value(ranges: &Vec<ElfMap>, loc: u64) -> u64 {
     for range in ranges {
         let range_start = range.src_start;
@@ -45,53 +33,27 @@ fn map_elf_value(ranges: &Vec<ElfMap>, loc: u64) -> u64 {
 
 fn get_lowest_location(lines: &[String]) -> u64 {
     let mut seeds: Vec<u64> = Vec::new();
-    let mut seed_to_soil_map: Vec<ElfMap> = Vec::new();
-    let mut soil_to_fertilizer_map: Vec<ElfMap> = Vec::new();
-    let mut fertilizer_to_water_map: Vec<ElfMap> = Vec::new();
-    let mut water_to_light_map: Vec<ElfMap> = Vec::new();
-    let mut light_to_temperature_map: Vec<ElfMap> = Vec::new();
-    let mut temperature_to_humidity_map: Vec<ElfMap> = Vec::new();
-    let mut humidity_to_location_map: Vec<ElfMap> = Vec::new();
 
-    let mut parse_state = ParseState::ReadSeeds;
+    let mut maps = Vec::new();
     for line in lines {
         let toks: Vec<&str> = line.split(":").collect();
         match toks[0] {
             "seeds" => {
-                assert_eq!(parse_state, ParseState::ReadSeeds);
                 // Read the seed numbers
                 let numbers: Vec<&str> = toks[1].split_whitespace().collect();
                 for n in numbers {
                     seeds.push(n.parse::<u64>().unwrap());
                 }
             }
-            "seed-to-soil map" => {
-                assert_eq!(parse_state, ParseState::ReadSeeds);
-                parse_state = ParseState::ReadSeedToSoilMap;
-            }
-            "soil-to-fertilizer map" => {
-                assert_eq!(parse_state, ParseState::ReadSeedToSoilMap);
-                parse_state = ParseState::ReadSoilToFertilizerMap;
-            }
-            "fertilizer-to-water map" => {
-                assert_eq!(parse_state, ParseState::ReadSoilToFertilizerMap);
-                parse_state = ParseState::ReadFertilizerToWaterMap;
-            }
-            "water-to-light map" => {
-                assert_eq!(parse_state, ParseState::ReadFertilizerToWaterMap);
-                parse_state = ParseState::ReadWaterToLightMap;
-            }
-            "light-to-temperature map" => {
-                assert_eq!(parse_state, ParseState::ReadWaterToLightMap);
-                parse_state = ParseState::ReadLightToTemperatureMap;
-            }
-            "temperature-to-humidity map" => {
-                assert_eq!(parse_state, ParseState::ReadLightToTemperatureMap);
-                parse_state = ParseState::ReadTemperatureToHumidityMap;
-            }
-            "humidity-to-location map" => {
-                assert_eq!(parse_state, ParseState::ReadTemperatureToHumidityMap);
-                parse_state = ParseState::ReadHumidityToLocationMap;
+
+            "seed-to-soil map"
+            | "soil-to-fertilizer map"
+            | "fertilizer-to-water map"
+            | "water-to-light map"
+            | "light-to-temperature map"
+            | "temperature-to-humidity map"
+            | "humidity-to-location map" => {
+                maps.push(Vec::new());
             }
 
             "" => {}
@@ -108,32 +70,7 @@ fn get_lowest_location(lines: &[String]) -> u64 {
                     src_start,
                     range_len,
                 };
-                match parse_state {
-                    ParseState::ReadSeedToSoilMap => {
-                        seed_to_soil_map.push(elf_map);
-                    }
-                    ParseState::ReadSoilToFertilizerMap => {
-                        soil_to_fertilizer_map.push(elf_map);
-                    }
-                    ParseState::ReadFertilizerToWaterMap => {
-                        fertilizer_to_water_map.push(elf_map);
-                    }
-                    ParseState::ReadWaterToLightMap => {
-                        water_to_light_map.push(elf_map);
-                    }
-                    ParseState::ReadLightToTemperatureMap => {
-                        light_to_temperature_map.push(elf_map);
-                    }
-                    ParseState::ReadTemperatureToHumidityMap => {
-                        temperature_to_humidity_map.push(elf_map);
-                    }
-                    ParseState::ReadHumidityToLocationMap => {
-                        humidity_to_location_map.push(elf_map);
-                    }
-                    ParseState::ReadSeeds => {
-                        panic!("Invalid state: {:?}", parse_state);
-                    }
-                }
+                maps.last_mut().unwrap().push(elf_map);
             }
         }
     }
@@ -141,14 +78,6 @@ fn get_lowest_location(lines: &[String]) -> u64 {
     //println! {"seeds: {:?}", seeds};
 
     let mut min_seed_loc = seeds[0];
-    let mut maps = Vec::new();
-    maps.push(&seed_to_soil_map);
-    maps.push(&soil_to_fertilizer_map);
-    maps.push(&fertilizer_to_water_map);
-    maps.push(&water_to_light_map);
-    maps.push(&light_to_temperature_map);
-    maps.push(&temperature_to_humidity_map);
-    maps.push(&humidity_to_location_map);
 
     for mut loc in seeds {
         for map in &maps {
