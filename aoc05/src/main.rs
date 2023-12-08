@@ -20,19 +20,32 @@ struct ElfMap {
     range_len: u64,
 }
 
+trait Contains {
+    fn contains(&self, val: u64) -> bool;
+    fn last(&self) -> u64;
+}
+
+impl Contains for ElfMap {
+    fn contains(&self, val: u64) -> bool {
+        val >= self.src_start && val < self.src_start + self.range_len
+    }
+
+    fn last(&self) -> u64 {
+        self.src_start + self.range_len
+    }
+}
+
 fn map_elf_value(ranges: &Vec<ElfMap>, loc: u64) -> u64 {
     for range in ranges {
-        let range_start = range.src_start;
-        let range_end = range.src_start + range.range_len;
-        if loc >= range_start && loc < range_end {
-            return loc - range_start + range.dest_start;
+        if range.contains(loc) {
+            return loc - range.src_start + range.dest_start;
         }
     }
     loc
 }
 
-fn get_lowest_location(lines: &[String]) -> u64 {
-    let mut seeds: Vec<u64> = Vec::new();
+fn get_lowest_location(lines: &[String], use_seed_ranges: bool) -> u64 {
+    let mut seeds = Vec::new();
 
     let mut maps = Vec::new();
     for line in lines {
@@ -77,14 +90,36 @@ fn get_lowest_location(lines: &[String]) -> u64 {
 
     //println! {"seeds: {:?}", seeds};
 
-    let mut min_seed_loc = seeds[0];
+    // Sort each ElfMap by src_start.
+    maps.iter_mut()
+        .for_each(|m| m.sort_by(|a, b| a.src_start.cmp(&b.src_start)));
 
-    for mut loc in seeds {
-        for map in &maps {
-            loc = map_elf_value(map, loc);
+    let mut min_seed_loc = u64::MAX;
+
+    if use_seed_ranges {
+        assert_eq!(seeds.len() % 2, 0);
+        for pairs in seeds.chunks(2) {
+            let base_loc = pairs[0];
+            let range = pairs[1];
+            //println!{"Trying {} {}", base_loc, range};
+            for i in 0..range {
+                let mut loc = base_loc + i;
+                for map in &maps {
+                    loc = map_elf_value(map, loc);
+                }
+
+                min_seed_loc = std::cmp::min(min_seed_loc, loc);
+            }
+            //println! {"min_seed_loc so far: {}", min_seed_loc};
         }
+    } else {
+        for mut loc in seeds {
+            for map in &maps {
+                loc = map_elf_value(map, loc);
+            }
 
-        min_seed_loc = std::cmp::min(min_seed_loc, loc);
+            min_seed_loc = std::cmp::min(min_seed_loc, loc);
+        }
     }
 
     println! {"Location: {}", min_seed_loc};
@@ -93,17 +128,33 @@ fn get_lowest_location(lines: &[String]) -> u64 {
 
 #[test]
 fn test_prelim() {
-    let loc = get_lowest_location(&get_input("prelim.txt"));
+    let loc = get_lowest_location(&get_input("prelim.txt"), false);
     assert_eq!(loc, 35);
 }
 
 #[test]
 fn test_part1() {
-    let loc = get_lowest_location(&get_input("input.txt"));
+    let loc = get_lowest_location(&get_input("input.txt"), false);
     assert_eq!(loc, 910845529);
 }
 
+#[test]
+fn test_prelim2() {
+    let loc = get_lowest_location(&get_input("prelim.txt"), true);
+    assert_eq!(loc, 46);
+}
+
+// Too slow to be part of automated testing
+/*#[test]
+fn test_part2() {
+    let loc = get_lowest_location(&get_input("input.txt"), true);
+    assert_eq!(loc, 77435348);
+}*/
+
 fn main() {
-    get_lowest_location(&get_input("prelim.txt"));
-    get_lowest_location(&get_input("input.txt"));
+    get_lowest_location(&get_input("prelim.txt"), false);
+    get_lowest_location(&get_input("input.txt"), false);
+    get_lowest_location(&get_input("prelim.txt"), true);
+    // Too slow to be run normally
+    //get_lowest_location(&get_input("input.txt"), true);
 }
