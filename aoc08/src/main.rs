@@ -29,7 +29,6 @@ impl ToNode for str {
 struct Network {
     directions: Vec<bool>,
     netmap: HashMap<Node, [Node; 2]>,
-    dir_ctr: usize,
 }
 
 impl Network {
@@ -66,34 +65,30 @@ impl Network {
         }
         //println! {"directions {:?}", directions};
         //println! {"netmap {:?}", netmap};
-        Self {
-            directions,
-            netmap,
-            dir_ctr: 0,
-        }
+        Self { directions, netmap }
     }
 
-    fn next_step(&mut self) -> bool {
-        let next = self.directions[self.dir_ctr];
-        if self.dir_ctr == (self.directions.len() - 1) {
-            self.dir_ctr = 0;
-        } else {
-            self.dir_ctr += 1;
-        }
-        next
+    fn next_step(&self, dir_ctr: usize) -> bool {
+        self.directions[dir_ctr]
     }
 }
 
 fn compute_steps(lines: &[String]) -> u64 {
-    let mut network = Network::new(lines);
+    let network = Network::new(lines);
 
     let mut steps = 0;
+    let mut dir_ctr = 0;
     let start: Node = "AAA".to_node();
     let stop: Node = "ZZZ".to_node();
     let mut cur_node = start;
     while cur_node != stop {
         steps += 1;
-        let left = network.next_step();
+        let left = network.next_step(dir_ctr);
+        if dir_ctr == network.directions.len() - 1 {
+            dir_ctr = 0;
+        } else {
+            dir_ctr += 1;
+        }
         //println!{"Visiting {:?} {}", cur_node, if left { "Left" } else { "Right" }};
         //println!{"{:?}", network.netmap[&cur_node]};
         if left {
@@ -101,6 +96,51 @@ fn compute_steps(lines: &[String]) -> u64 {
         } else {
             cur_node = network.netmap[&cur_node][1];
         }
+    }
+
+    println! {"Steps: {}", steps};
+    steps
+}
+
+fn ghost_finished(nodes: &Vec<&Node>) -> bool {
+    for node in nodes {
+        if node[2] != 'Z' {
+            return false;
+        }
+    }
+    true
+}
+
+fn compute_ghost_steps(lines: &[String]) -> u64 {
+    let network = Network::new(lines);
+
+    let mut steps = 0;
+    let mut dir_ctr = 0;
+    let mut nodes = Vec::new();
+    network.netmap.keys().for_each(|k| {
+        if k[2] == 'A' {
+            nodes.push(k);
+        }
+    });
+
+    println! {"nodes: {:?}", nodes};
+    while !ghost_finished(&nodes) {
+        steps += 1;
+        let left = network.next_step(dir_ctr);
+        if dir_ctr == network.directions.len() - 1 {
+            dir_ctr = 0;
+        } else {
+            dir_ctr += 1;
+        }
+        let mut next_nodes = Vec::new();
+        for node in nodes {
+            if left {
+                next_nodes.push(&network.netmap[node][0]);
+            } else {
+                next_nodes.push(&network.netmap[node][1]);
+            }
+        }
+        nodes = next_nodes;
     }
 
     println! {"Steps: {}", steps};
@@ -125,8 +165,16 @@ fn test_part1() {
     assert_eq!(steps, 18157);
 }
 
+#[test]
+fn test_prelim_2() {
+    let steps = compute_ghost_steps(&get_input("prelim2.txt"));
+    assert_eq!(steps, 6);
+}
+
 fn main() {
     compute_steps(&get_input("prelim.txt"));
     compute_steps(&get_input("prelim_a.txt"));
     compute_steps(&get_input("input.txt"));
+    compute_ghost_steps(&get_input("prelim2.txt"));
+    compute_ghost_steps(&get_input("input.txt"));
 }
