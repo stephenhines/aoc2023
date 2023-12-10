@@ -27,7 +27,7 @@ impl ToNode for str {
 }
 
 struct Network {
-    directions: Vec<bool>,
+    directions: Vec<usize>,
     netmap: HashMap<Node, [Node; 2]>,
 }
 
@@ -37,9 +37,9 @@ impl Network {
         let line = lines.first().unwrap();
         for i in line.chars() {
             if i == 'L' {
-                directions.push(true);
+                directions.push(0);
             } else {
-                directions.push(false);
+                directions.push(1);
             }
         }
 
@@ -68,7 +68,7 @@ impl Network {
         Self { directions, netmap }
     }
 
-    fn next_step(&self, dir_ctr: usize) -> bool {
+    fn next_step(&self, dir_ctr: usize) -> usize {
         self.directions[dir_ctr]
     }
 }
@@ -83,39 +83,71 @@ fn compute_steps(lines: &[String]) -> u64 {
     let mut cur_node = start;
     while cur_node != stop {
         steps += 1;
-        let left = network.next_step(dir_ctr);
+        let left_or_right = network.next_step(dir_ctr);
         if dir_ctr == network.directions.len() - 1 {
             dir_ctr = 0;
         } else {
             dir_ctr += 1;
         }
-        //println!{"Visiting {:?} {}", cur_node, if left { "Left" } else { "Right" }};
-        //println!{"{:?}", network.netmap[&cur_node]};
-        if left {
-            cur_node = network.netmap[&cur_node][0];
-        } else {
-            cur_node = network.netmap[&cur_node][1];
-        }
+        cur_node = network.netmap[&cur_node][left_or_right];
     }
 
     println! {"Steps: {}", steps};
     steps
 }
 
-fn ghost_finished(nodes: &Vec<&Node>) -> bool {
-    for node in nodes {
-        if node[2] != 'Z' {
-            return false;
-        }
-    }
-    true
-}
-
-fn compute_ghost_steps(lines: &[String]) -> u64 {
-    let network = Network::new(lines);
-
+fn find_loop_count(network: &Network, start: &Node) -> usize {
     let mut steps = 0;
     let mut dir_ctr = 0;
+    let mut node = start;
+    while node[2] != 'Z' {
+        steps += 1;
+        let left_or_right = network.next_step(dir_ctr);
+        if dir_ctr == network.directions.len() - 1 {
+            dir_ctr = 0;
+        } else {
+            dir_ctr += 1;
+        }
+        node = &network.netmap[node][left_or_right];
+    }
+
+    println! {"loop count: {}", steps};
+    println! {"dir_len: {}", network.directions.len()};
+
+    // Each of the loops of these nodes has the same period, even if the exact
+    // path isn't repeated.
+
+    steps
+}
+
+fn gcd(mut a: usize, mut b: usize) -> usize {
+    if b > a {
+        return gcd(b, a);
+    }
+    while b != 0 {
+        let t = b;
+        b = a % b;
+        a = t;
+    }
+    return a;
+}
+
+fn lcm(a: usize, b: usize) -> usize {
+    // According to wikipedia, `lcm(a, b) = \abs(ab) / gcd(a, b)`
+    a * (b / gcd(a, b))
+}
+
+fn lcm_multi(nums: &Vec<usize>) -> usize {
+    let mut val = nums[0];
+    for num in &nums[1..] {
+        val = lcm(val, *num);
+    }
+    val
+}
+
+fn compute_ghost_steps(lines: &[String]) -> usize {
+    let network = Network::new(lines);
+
     let mut nodes = Vec::new();
     network.netmap.keys().for_each(|k| {
         if k[2] == 'A' {
@@ -123,28 +155,20 @@ fn compute_ghost_steps(lines: &[String]) -> u64 {
         }
     });
 
-    println! {"nodes: {:?}", nodes};
-    while !ghost_finished(&nodes) {
-        steps += 1;
-        let left = network.next_step(dir_ctr);
-        if dir_ctr == network.directions.len() - 1 {
-            dir_ctr = 0;
-        } else {
-            dir_ctr += 1;
-        }
-        let mut next_nodes = Vec::new();
-        for node in nodes {
-            if left {
-                next_nodes.push(&network.netmap[node][0]);
-            } else {
-                next_nodes.push(&network.netmap[node][1]);
-            }
-        }
-        nodes = next_nodes;
+    //println! {"nodes: {:?}", nodes};
+    let mut loop_counts = Vec::new();
+    for node in nodes {
+        loop_counts.push(find_loop_count(&network, node));
     }
+    //println! {"loop_counts: {:?}", loop_counts};
 
-    println! {"Steps: {}", steps};
-    steps
+    // Now that we have all the counts, we need to find the least common multiple
+    // of all the values. We can do this by factoring all the numbers
+
+    let lcm_steps = lcm_multi(&loop_counts);
+
+    println! {"Steps: {}", lcm_steps};
+    lcm_steps
 }
 
 #[test]
@@ -169,6 +193,12 @@ fn test_part1() {
 fn test_prelim_2() {
     let steps = compute_ghost_steps(&get_input("prelim2.txt"));
     assert_eq!(steps, 6);
+}
+
+#[test]
+fn test_part2() {
+    let steps = compute_ghost_steps(&get_input("input.txt"));
+    assert_eq!(steps, 14299763833181);
 }
 
 fn main() {
