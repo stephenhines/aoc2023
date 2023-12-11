@@ -17,6 +17,6 @@ repos:
     hooks:
     -   id: cargo-test
         name: cargo test
-        entry: cargo test
+        entry: cargo test --release
         language: rust
         pass_filenames: false
