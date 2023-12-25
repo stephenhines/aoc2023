@@ -35,7 +35,7 @@ struct Hand {
 }
 
 impl Hand {
-    fn new(hand_str: &str, bid: u64) -> Self {
+    fn new(hand_str: &str, bid: u64, jokers: bool) -> Self {
         // Just zero initialize everything
         let mut hand = Hand {
             hand_type: HandType::HighCard,
@@ -47,6 +47,7 @@ impl Hand {
 
         // Just use simple 15 element array since J-A get marked as 11-14,
         // and we don't care about the nonexistent 0 and 1 entries.
+        // Later we use 1 for Jokers.
         let mut card: [u8; 15] = [0; 15];
         let mut val;
         for (i, c) in hand_str.chars().enumerate() {
@@ -55,7 +56,11 @@ impl Hand {
                     val = 10;
                 }
                 'J' => {
-                    val = 11;
+                    if jokers {
+                        val = 1;
+                    } else {
+                        val = 11;
+                    }
                 }
                 'Q' => {
                     val = 12;
@@ -79,15 +84,19 @@ impl Hand {
 
         // No longer needs to be mutable.
         let card = card;
+        let num_jokers = card[1];
 
         // Search for hands in decreasing order of importance
-        // 5 and 4 of a kind
         for i in (2..15).rev() {
-            if card[i] == 5 {
+            if card[i] + num_jokers == 5 {
                 hand.hand_type = HandType::FiveOfAKind;
                 hand.high_cards[0] = i;
                 return hand;
-            } else if card[i] == 4 {
+            }
+        }
+
+        for i in (2..15).rev() {
+            if card[i] + num_jokers == 4 {
                 hand.hand_type = HandType::FourOfAKind;
                 hand.high_cards[0] = i;
                 for j in (2..15).rev() {
@@ -97,10 +106,14 @@ impl Hand {
                     }
                 }
                 panic! {"4 of a kind with no other cards! {}", hand_str};
-            } else if card[i] == 3 {
+            }
+        }
+
+        for i in (2..15).rev() {
+            if card[i] + num_jokers == 3 {
                 hand.high_cards[0] = i;
                 for j in (2..15).rev() {
-                    if card[j] == 2 {
+                    if card[j] == 2 && j != i {
                         hand.hand_type = HandType::FullHouse;
                         hand.high_cards[1] = j;
                         return hand;
@@ -122,7 +135,7 @@ impl Hand {
 
         // Two pair and One pair
         for i in (2..15).rev() {
-            if card[i] == 2 {
+            if card[i] + num_jokers == 2 {
                 let mut next_high_card = 0;
                 hand.hand_type = HandType::OnePair;
                 hand.high_cards[next_high_card] = i;
@@ -149,6 +162,9 @@ impl Hand {
                 panic! {"1 pair with not enough other cards! {}", hand_str};
             }
         }
+
+        // We can't have any jokers if we reach this point.
+        assert_eq!(num_jokers, 0);
 
         // High card
         let mut next_high_card = 0;
@@ -203,7 +219,7 @@ impl PartialOrd for Hand {
     }
 }
 
-fn compute_winnings(lines: &[String]) -> u64 {
+fn compute_winnings(lines: &[String], jokers: bool) -> u64 {
     let mut hands = Vec::new();
 
     for line in lines {
@@ -211,7 +227,7 @@ fn compute_winnings(lines: &[String]) -> u64 {
         let bid: u64 = toks[1].parse().unwrap();
         let hand_str = toks[0].trim();
 
-        let hand = Hand::new(hand_str, bid);
+        let hand = Hand::new(hand_str, bid, jokers);
         //println! {"hand: {:?}", hand};
 
         hands.push(hand);
@@ -236,17 +252,31 @@ fn compute_winnings(lines: &[String]) -> u64 {
 
 #[test]
 fn test_prelim() {
-    let winnings = compute_winnings(&get_input("prelim.txt"));
+    let winnings = compute_winnings(&get_input("prelim.txt"), false);
     assert_eq!(winnings, 6440);
 }
 
 #[test]
 fn test_part1() {
-    let winnings = compute_winnings(&get_input("input.txt"));
+    let winnings = compute_winnings(&get_input("input.txt"), false);
     assert_eq!(winnings, 248569531);
 }
 
+#[test]
+fn test_prelim2() {
+    let winnings = compute_winnings(&get_input("prelim.txt"), true);
+    assert_eq!(winnings, 5905);
+}
+
+#[test]
+fn test_part2() {
+    let winnings = compute_winnings(&get_input("input.txt"), true);
+    assert_eq!(winnings, 250382098);
+}
+
 fn main() {
-    compute_winnings(&get_input("prelim.txt"));
-    compute_winnings(&get_input("input.txt"));
+    compute_winnings(&get_input("prelim.txt"), false);
+    compute_winnings(&get_input("input.txt"), false);
+    compute_winnings(&get_input("prelim.txt"), true);
+    compute_winnings(&get_input("input.txt"), true);
 }
