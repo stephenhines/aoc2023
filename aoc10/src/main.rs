@@ -14,6 +14,9 @@ fn get_input(filename: &str) -> Vec<String> {
     lines
 }
 
+// Set to true to enable debug prints.
+const DEBUG: bool = false;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Direction {
     Up,
@@ -33,6 +36,20 @@ struct Grid {
     pipemap: Vec<Vec<char>>,
 }
 
+impl std::fmt::Display for Grid {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "pipemap[{}][{}]", self.height, self.width)?;
+        writeln!(f, "start: {:?}", self.start)?;
+        for y in 0..self.height {
+            for x in 0..self.width {
+                write!(f, "{}", self.pipemap[y][x])?;
+            }
+            writeln!(f, "")?;
+        }
+        Ok(())
+    }
+}
+
 impl Grid {
     fn new(lines: &[String]) -> Self {
         let height = lines.len();
@@ -50,6 +67,62 @@ impl Grid {
             }
             pipemap.push(piperow);
         }
+
+        // Replace S with the correctly shaped piece to make things easier.
+        let (x, y) = start;
+        let mut valid = (false, false, false, false);
+        // Check up
+        if y > 0 {
+            let up = pipemap[y - 1][x];
+            match up {
+                'F' | '7' | '|' => {
+                    valid.0 = true;
+                }
+                _ => {}
+            }
+        }
+        if y + 1 < height {
+            let down = pipemap[y + 1][x];
+            match down {
+                'L' | 'J' | '|' => {
+                    valid.1 = true;
+                }
+                _ => {}
+            }
+        }
+        if x > 0 {
+            let left = pipemap[y][x - 1];
+            match left {
+                'F' | 'L' | '-' => {
+                    valid.2 = true;
+                }
+                _ => {}
+            }
+        }
+        if x + 1 < width {
+            let right = pipemap[y][x + 1];
+            match right {
+                'J' | '7' | '-' => {
+                    valid.3 = true;
+                }
+                _ => {}
+            }
+        }
+
+        let replace_start = match valid {
+            // (Up, Down, Left, Right)
+            (true, true, false, false) => '|',
+            (true, false, true, false) => 'J',
+            (true, false, false, true) => 'L',
+            (false, true, true, false) => '7',
+            (false, true, false, true) => 'F',
+            (false, false, true, true) => '-',
+            (_, _, _, _) => {
+                panic!("Invalid Start state: {:?}", start);
+            }
+        };
+
+        pipemap[y][x] = replace_start;
 
         Grid {
             height,
@@ -119,10 +192,18 @@ impl Grid {
         Direction::Invalid
     }
 
-    fn get_loop_length(&self, dir: Direction) -> usize {
+    fn get_loop(&self) -> HashSet<Coord> {
         let mut set: HashSet<Coord> = HashSet::new();
-        let mut steps = 0;
         let mut pos = self.start;
+
+        let start_pipe = self.pipemap[pos.1][pos.0];
+        let dir = match start_pipe {
+            'J' | 'L' | '|' => Direction::Up,
+            '7' | 'F' => Direction::Down,
+            '-' => Direction::Left,
+            _ => Direction::Invalid,
+        };
+        //println!("{}", self);
 
         match dir {
             Direction::Up => {
@@ -153,7 +234,7 @@ impl Grid {
 
         //println!("Adding start {:?} and going {:?}", self.start, from);
         if self.get_next_dir(pos, from) == Direction::Invalid {
-            return 0;
+            return /* empty */ set;
         }
 
         set.insert(self.start);
@@ -161,7 +242,6 @@ impl Grid {
             if set.contains(&pos) {
                 break;
             }
-            steps += 1;
             set.insert(pos);
             from = self.get_next_dir(pos, from);
             //println!("Visiting {:?} and going {:?}", pos, from);
@@ -185,56 +265,81 @@ impl Grid {
             }
         }
 
-        steps
+        set
     }
 
     fn get_max_distance(&self) -> usize {
-        let mut loop_len = 0;
-
-        // When starting, we need to try all directions from S
-
-        // Up
-        let up_len = self.get_loop_length(Direction::Up);
-        if up_len != 0 {
-            loop_len = up_len;
-        }
-
-        // Down
-        let down_len = self.get_loop_length(Direction::Down);
-        if loop_len == 0 && down_len != 0 {
-            loop_len = down_len;
-        } else if down_len != 0 {
-            assert_eq!(loop_len, down_len);
-        }
-
-        // Left
-        let left_len = self.get_loop_length(Direction::Left);
-        if loop_len == 0 && left_len != 0 {
-            loop_len = left_len;
-        } else if left_len != 0 {
-            assert_eq!(loop_len, left_len);
-        }
-
-        // Right
-        let right_len = self.get_loop_length(Direction::Right);
-        if loop_len == 0 && right_len != 0 {
-            loop_len = right_len;
-        } else if right_len != 0 {
-            assert_eq!(loop_len, right_len);
-        }
+        let loop_len = self.get_loop().len();
 
         // Max distance is halfway around the loop (rounding up)
         (loop_len + 1) / 2
+    }
+
+    fn get_enclosed_area(&self) -> usize {
+        let mut area = 0;
+        let set = self.get_loop();
+
+        // Use parity to determine inside/outside. Odd number of border
+        // crossings will be inside, and even numbers will be outside.A
+        // We only need to track |, L, and J (and maybe S) for border
+        // crossing points. F and 7
+        for y in 0..self.height {
+            // Always start outside
+            let mut inside = false;
+            for x in 0..self.width {
+                let c = (x, y);
+                if set.contains(&c) {
+                    let shape = self.pipemap[y][x];
+                    if DEBUG {
+                        print!("{}", shape);
+                    }
+                    match shape {
+                        '|' | 'J' | 'L' => {
+                            inside = !inside;
+                        }
+                        '7' | 'F' | '-' => {
+                            // Do nothing
+                        }
+                        _ => {
+                            panic!("Unknown symbol: {}", shape);
+                        }
+                    }
+                } else {
+                    if inside {
+                        area += 1;
+                        if DEBUG {
+                            print!("I");
+                        }
+                    } else {
+                        if DEBUG {
+                            print!("O");
+                        }
+                    }
+                }
+            }
+            if DEBUG {
+                println!("");
+            }
+        }
+
+        area
     }
 }
 
 fn get_max_distance(lines: &[String]) -> usize {
     let grid = Grid::new(lines);
-    //dbg!(&grid);
 
     let len = grid.get_max_distance();
     println!("max length: {}", len);
     len
+}
+
+fn get_area(lines: &[String]) -> usize {
+    let grid = Grid::new(lines);
+
+    let area = grid.get_enclosed_area();
+    println!("area: {}", area);
+    area
 }
 
 #[test]
@@ -249,7 +354,21 @@ fn test_part1() {
     assert_eq!(dist, 6867);
 }
 
+#[test]
+fn test_prelim2() {
+    let area = get_area(&get_input("prelim2.txt"));
+    assert_eq!(area, 10);
+}
+
+#[test]
+fn test_part2() {
+    let area = get_area(&get_input("input.txt"));
+    assert_eq!(area, 595);
+}
+
 fn main() {
     get_max_distance(&get_input("prelim.txt"));
     get_max_distance(&get_input("input.txt"));
+    get_area(&get_input("prelim2.txt"));
+    get_area(&get_input("input.txt"));
 }
